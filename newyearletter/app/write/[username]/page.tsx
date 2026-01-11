@@ -18,54 +18,67 @@ export default function WriteLetterPage() {
   const sendLetter = async () => {
     if (!nickname || !content) return alert("Please fill in everything!");
 
-    // 1. 유저 아이디 찾기
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("id")
-      .eq("username", username)
-      .single();
+    try {
+      // 1. Get profile ID
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("username", username)
+        .single();
 
-    if (!profile) return alert("User not found!");
+      if (!profile) return alert("User not found!");
 
-    // 2. 해당 유저의 mailbox_id 찾기
-    const { data: mailbox } = await supabase
-      .from("mailboxes")
-      .select("id")
-      .eq("user_id", profile.id)
-      .single();
+      // 2. Get mailbox ID
+      const { data: mailbox, error: mailboxError } = await supabase
+        .from("mailboxes")
+        .select("id")
+        .eq("user_id", profile.id)
+        .single();
 
-    // 3. 편지 저장
-    const { error } = await supabase.from("letters").insert({
-      mailbox_id: mailbox!.id,
-      nickname: nickname,
-      content: content,
-      envelope: selectedEnvelope,
-    });
+      if (mailboxError || !mailbox) return alert("Mailbox not found!");
 
-    if (!error) {
+      // 3. Convert envelope color to level (int) matching your table
+      const envelopeLevel = ENVELOPES.indexOf(selectedEnvelope) + 1;
+
+      // 4. Send letter with correct column names: sender_name, envelope_level
+      const { error } = await supabase.from("letters").insert({
+        mailbox_id: mailbox.id,
+        sender_name: nickname, // Your table column name
+        content: content, // Your table column name
+        envelope_level: envelopeLevel, // Your table column name (int)
+      });
+
+      if (error) throw error;
+
       alert("Letter sent successfully! 💌");
       router.push("/");
+    } catch (error: any) {
+      console.error("Error sending letter:", error);
+      alert(`Error: ${error.message}`);
     }
   };
 
   return (
     <main className="min-h-screen bg-[#FFF9F6] px-8 py-12">
-      <h1 className="text-center font-jersey text-2xl mb-8">
-        Write to {username}
+      <h1 className="text-center font-jersey text-3xl mb-8">
+        Write a letter to {username}
       </h1>
 
-      {/* 봉투 선택 */}
+      {/* Choose Envelope */}
       <div className="mb-8">
-        <p className="text-sm font-bold mb-3">1. Choose an envelope</p>
+        <p className="text-xl font-jersey mb-3 text-gray-800">
+          1. Choose an envelope
+        </p>
         <div className="flex justify-between gap-2">
           {ENVELOPES.map((color) => (
             <button
               key={color}
+              type="button"
               onClick={() => setSelectedEnvelope(color)}
               className={`rounded-xl border-2 p-2 transition ${
                 selectedEnvelope === color
-                  ? "border-yellow-400 bg-white"
-                  : "border-transparent opacity-50"
+                  ? "border-yellow-400 bg-white shadow-md"
+                  : "border-transparent opacity-50 hover:opacity-100"
               }`}
             >
               <Image
@@ -79,32 +92,34 @@ export default function WriteLetterPage() {
         </div>
       </div>
 
-      {/* 닉네임 & 내용 */}
-      <div className="space-y-4">
+      {/* Input Fields */}
+      <div className="space-y-6">
         <div>
-          <p className="text-sm font-bold mb-2">2. Your Nickname</p>
+          <p className="text-xl font-jersey mb-2 text-gray-800">
+            2. Your Nickname
+          </p>
           <input
             value={nickname}
             onChange={(e) => setNickname(e.target.value)}
             placeholder="Who are you?"
-            className="w-full rounded-xl border border-gray-200 p-3 outline-none focus:border-yellow-400"
+            className="w-full rounded-xl border border-gray-200 p-4 outline-none focus:border-yellow-400 text-black shadow-sm"
           />
         </div>
         <div>
-          <p className="text-sm font-bold mb-2">3. Message</p>
+          <p className="text-xl font-jersey mb-2 text-gray-800">3. Message</p>
           <textarea
             value={content}
             onChange={(e) => setContent(e.target.value)}
             rows={5}
             placeholder="Write a message for 2026..."
-            className="w-full rounded-2xl border border-gray-200 p-4 outline-none focus:border-yellow-400 resize-none"
+            className="w-full rounded-2xl border border-gray-200 p-4 outline-none focus:border-yellow-400 resize-none text-black shadow-sm"
           />
         </div>
       </div>
 
       <button
         onClick={sendLetter}
-        className="mt-10 w-full rounded-full bg-yellow-400 py-4 font-bold text-lg shadow-lg active:scale-95 transition"
+        className="mt-12 w-full rounded-full bg-yellow-400 py-4 text-2xl font-jersey text-black shadow-lg active:scale-95 transition-transform hover:bg-yellow-500"
       >
         Send Letter 💌
       </button>
